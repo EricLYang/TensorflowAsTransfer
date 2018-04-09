@@ -1,0 +1,76 @@
+from ExampleModel import myTensorHED as Hed_tensor
+
+class Network:
+
+   def __init__(self, Hed_Tf_P):
+        
+        #load weight from HED net
+        self.side_1_f, self.side_1_b, self.side_1_d, self.side_2_f, self.side_2_b, self.side_2_d, self.side_3_f, self.side_3_b, self.side_3_d, self.side_4_f, self.side_4_b, self.side_4_d, self.side_5_f, self.side_5_b, self.side_5_d = Hed_Tf_P._get_parameter()
+
+
+   def build(self, rgb, train=true):
+    
+        with tf.name_scope('Processing'):
+
+            red, green, blue = tf.split(rgb, 3, 3)
+            # assert red.get_shape().as_list()[1:] == [224, 224, 1]
+            # assert green.get_shape().as_list()[1:] == [224, 224, 1]
+            # assert blue.get_shape().as_list()[1:] == [224, 224, 1]
+            bgr = tf.concat([
+                blue - VGG_MEAN[0],
+                green - VGG_MEAN[1],
+                red - VGG_MEAN[2],
+            ], 3)
+
+        self.conv1_1 = self._conv_layer(bgr, "conv1_1")
+        self.conv1_2 = self._conv_layer(self.conv1_1, "conv1_2")
+        self.side_1 = self._side_layer(self.conv1_2, "side_1", 1)
+        self.pool1 = self._max_pool(self.conv1_2, 'pool1', debug)
+
+   def _side_layer(self, inputs, name, upscale):
+        """
+            1x1 conv followed with Deconvoltion layer to upscale the size of input image sans color
+        """
+        with tf.variable_scope(name):
+
+            in_shape = inputs.shape.as_list()
+            w_shape = [1, 1, in_shape[-1], 1]
+            if name == "side_1":
+               w_init0 = self.side_1_f
+               b_init0 = self.side_1_b
+               d_init  = self.side_1_d
+
+
+            classifier = self.conv_layer(inputs, w_shape, b_shape=1,
+                                         w_init = w_init0,
+                                         b_init = b_init0,
+                                         name=name + '_reduction')
+
+            classifier = self.deconv_layer(classifier, upscale=upscale,
+                                           name='{}_deconv_{}'.format(name, upscale),
+                                           w_init=d_init)
+
+            return classifier
+
+
+# define Crack Hed
+hed_Graph      = tf.Graph()
+with hed_Graph.as_default():
+ Hed_Tf_P = Hed_tensor.HEDLAYERS(Hed_graph = hed_Graph)
+
+# ... define as many graph to import model and export paramtes as you want
+
+# define your own graph which will use the parameters from hed_Graph 
+unet_fcn_Graph = tf.Graph()
+
+# build your own model and initialize your model with the parameter which imported from
+# the above models
+
+with unet_fcn_Graph.as_default():
+    # Tell TensorFlow that the model will be built into the unet_fcn_Graph
+    with tf.Session(graph = unet_fcn_Graph) as sess:
+
+    build_net = Network(Hed_Tf_P)
+    build_net.build()
+
+    
